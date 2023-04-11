@@ -1,0 +1,5 @@
+telebot
+boto3
+openai
+speechrecognition
+pydub
