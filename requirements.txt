@@ -3,3 +3,5 @@ boto3
 openai
 speechrecognition
 pydub
+numpy
+soundfile

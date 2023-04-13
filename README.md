@@ -35,3 +35,6 @@ Telegram Bot :
 3-1 send /newbot
 3-2 choice username of bot
 3-3 copy access token (api key)
+
+
+finally you can use pythonanywhere website to deploy your chatbot. Good Luck.

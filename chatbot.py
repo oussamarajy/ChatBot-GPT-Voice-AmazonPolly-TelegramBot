@@ -2,10 +2,22 @@ import telebot
 import boto3
 import openai
 import speech_recognition as sr
-from pydub import AudioSegment
-import subprocess
 import time
 import os
+import soundfile as sf
+import linecache
+import sys
+
+def PrintException():
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    filename = f.f_code.co_filename
+    linecache.checkcache(filename)
+    line = linecache.getline(filename, lineno, f.f_globals)
+    print ('EXCEPTION IN ({}, LINE {} "{}"): {}'.format(filename, lineno, line.strip(), exc_obj))
+
+
 
 bot = telebot.TeleBot("YOUR-API-KEY-BOT")
 openai.api_key = "YOUR-API-KEY"
@@ -24,18 +36,20 @@ def process(message):
         engine="text-davinci-003",
         prompt=message,
         temperature=0.5,
-        max_tokens=50,
+        max_tokens=max_token,
         n=1,
         stop=None
     )
-    
+    # create an instance of the Polly client with your credentials
     polly = boto3.client('polly',
                          aws_access_key_id=aws_access_key_id,
                          aws_secret_access_key=aws_secret_access_key,
-                         region_name='us-east-1')
+                         region_name='us-east-1')  # specify the region you want to use
 
+    # specify the text you want to synthesize
     text = response.choices[0].text
 
+    # call the synthesize_speech method to synthesize the text
     response = polly.synthesize_speech(
         Text=text,
         OutputFormat='mp3',
@@ -44,25 +58,21 @@ def process(message):
     return response['AudioStream']
 
 
+# Define a function that handles audio messages
 @bot.message_handler(content_types=['voice'])
 def handle_audio(message):
   try:
     # Get the audio file sent by the user
     file_info = bot.get_file(message.voice.file_id)
     downloaded_file = bot.download_file(file_info.file_path)
-    file_user = f'audio-{time.time()}.wav'
-    file_speech = f'bot-{time.time()}.wav'
+    file_user = f'audios/audio-{time.time()}.oga'
+    file_speech = f'audios/bot-{time.time()}.wav'
     new_file = open(file_user, 'wb')
     new_file.write(downloaded_file)
     time.sleep(3)
-    # Set the path to the FFmpeg executable
-    ffmpeg_path = r"C:\<YOUR-PATH>\ffmpeg.exe"
-
-    # Load the audio file using FFmpeg
-    subprocess.call([ffmpeg_path, '-i', file_user, file_speech])
-
-    # Load the audio file
-    audio_file = AudioSegment.from_file(file_speech, format="wav")
+    # Convert oga to wav
+    data, samplerate = sf.read(file_user)
+    sf.write(file_speech, data, samplerate)
 
     # Initialize the speech recognizer
     r = sr.Recognizer()
@@ -73,40 +83,40 @@ def handle_audio(message):
 
     # Convert speech to text using Google Speech Recognition
     text = r.recognize_google(audio)
-    answer = f'audio{time.time()}.mp3'
+    answer = f'audios/audio{time.time()}.mp3'
     with open(answer, 'wb') as f:
         f.write(process(text).read())
         f.close()
     audio_file = open(answer, 'rb')
     bot.send_voice(chat_id=message.chat.id, voice=audio_file)
     file_paths = [file_user, file_speech, answer]
-    for file_path in file_paths:
-        # Check if the file exists
-        if os.path.exists(file_path):
-            # Remove the file
-            os.remove(file_path)
-        else:
-            print(f"File {file_path} does not exist")
-  except:
-    print("error")
+    os.remove(file_user)
+    os.remove(file_speech)
+    os.remove(answer)
+  except Exception as e:
+      #print(e)
+      PrintException()
 @bot.message_handler(func=lambda message: True)
 def send_voice_message(message):
-
+  try:
     # save the audio stream to a file
-    answer = f'audio{time.time()}.mp3'
+    answer = f'audios/audio{time.time()}.mp3'
     with open(answer, 'wb') as f:
         f.write(process(message.text).read())
         f.close()
     audio_file = open(answer, 'rb')
     bot.send_voice(chat_id=message.chat.id, voice=audio_file)
-    if os.path.exists(answer):
-        # Remove the file
-        os.remove(answer)
-    else:
-        print(f"File {answer} does not exist")
-
+    audio_file.close()
+    os.remove(answer)
+  except Exception as e:
+      # print(e)
+      PrintException()
 
 bot.polling()
+
+
+
+
 
 
 
